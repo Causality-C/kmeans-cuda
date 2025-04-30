@@ -68,7 +68,6 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     float *d_centroids;
     float *d_new_centroids;
     int *d_assignments;
-    int *d_counts;
     float *d_distance_for_points;
 
     // flatten the data points
@@ -89,7 +88,6 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     cudaMalloc(&d_data_points, sizeof(float) * num_pts * dims);
     cudaMalloc(&d_centroids, sizeof(float) * k * dims);
     cudaMalloc(&d_assignments, sizeof(int) * num_pts);
-    cudaMalloc(&d_counts, sizeof(int) * k);
     cudaMalloc(&d_distance_for_points, sizeof(float) * num_pts * k); // distance for each point to each centroid
     cudaMalloc(&d_new_centroids, sizeof(float) * k * dims);
 
@@ -144,6 +142,7 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
 
         // 1. Distance for each point to each centroid
         distanceForPoints<<<blocks_per_grid, threads_per_block>>>(d_data_points, d_centroids, d_distance_for_points, num_pts, k, dims);
+        cudaDeviceSynchronize();
 
         // 2. Get the minimum distance for each point -- reduction from num_pts * k -> num_pts (This requires two steps: https://nvidia.github.io/cccl/cub/api/structcub_1_1DeviceReduce.html#_CPPv4N3cub12DeviceReduceE)
         cub::DeviceSegmentedReduce::ArgMin(d_temp_storage, temp_storage_bytes, d_distance_for_points, d_argmin_output, num_pts, d_offsets, d_offsets + 1);
@@ -155,15 +154,15 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
 
         // 4. Sum the group of points assigned to each centroid
         sumNewCentroids<<<blocks_per_grid_sum, threads_per_block>>>(d_data_points, d_new_centroids, d_assignments, num_pts, k, dims);
-
-        std::vector<float> h_new_centroids(k * dims);
-        cudaMemcpy(h_new_centroids.data(), d_new_centroids, sizeof(float) * k * dims, cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
 
         // 5. Normalize the new centroids
         normalizeNewCentroids<<<blocks_per_grid_divide, threads_per_block>>>(d_new_centroids, d_cluster_sizes, k, dims);
+        cudaDeviceSynchronize();
 
         // 6. Set the new centroids to the old centroids
         cudaMemcpy(d_centroids, d_new_centroids, sizeof(float) * k * dims, cudaMemcpyDeviceToDevice);
+        cudaDeviceSynchronize();
 
         // 7. Check the shift between the old and new centroids
     }
@@ -185,12 +184,13 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     cudaFree(d_data_points);
     cudaFree(d_centroids);
     cudaFree(d_assignments);
-    cudaFree(d_counts);
     cudaFree(d_cluster_sizes);
     cudaFree(d_distance_for_points);
     cudaFree(d_temp_storage);
     cudaFree(d_temp_histogram_storage);
     cudaFree(d_offsets);
     cudaFree(d_new_centroids);
+    cudaFree(d_argmin_output);
+    cudaFree(d_temp_storage);
     return;
 }
