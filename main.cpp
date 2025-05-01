@@ -4,7 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <cmath>
-extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_points, std::vector<std::vector<float>> &centroids, int num_pts, int k, int max_iter, int dims);
+extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_points, std::vector<std::vector<float>> &centroids, int num_pts, int k, int max_iter, int dims, float tolerance);
 /*
  * kmeans initialization algorithms:
  *  seed: the seed provided via command line arguments
@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
     // Iterations
     if (use_gpu)
     {
-        launch_kmeans_kernel(data_points, centroids, num_pts, k, max_iter, dims);
+        launch_kmeans_kernel(data_points, centroids, num_pts, k, max_iter, dims, threshold);
     }
     else
     {
