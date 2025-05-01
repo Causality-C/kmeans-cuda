@@ -1,7 +1,7 @@
 all: main
 
-main: main.cpp kernel.cu
-	nvcc -o main main.cpp kernel.cu --extended-lambda -arch=sm_60
+main: main.cpp kmeans.cu config.cpp config.h kmeans.h profile.cpp profile.h
+	nvcc -o main main.cpp kmeans.cu config.cpp profile.cpp --extended-lambda -arch=sm_60
 
 clean:
 	rm -f main

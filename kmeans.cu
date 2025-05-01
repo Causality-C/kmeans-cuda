@@ -61,7 +61,6 @@ __global__ void normalizeNewCentroids(float *new_centroids, int *counts, int k, 
         new_centroids[centroid_idx * dims + dimension_idx] /= counts[centroid_idx];
     }
 }
-
 __global__ void checkConvergence(float *centroids, float *new_centroids, float *loss, int k, int dims)
 {
     extern __shared__ float shared_loss[];
@@ -170,9 +169,10 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     int total = k * dims;
     int blocks = (total + threads - 1) / threads;
     float sharedMemSize = threads * sizeof(float);
-    float loss;
+    float loss = INFINITY;
 
-    for (int i = 0; i < max_iter; i++)
+    int it;
+    for (it = 0; it < max_iter && sqrt(loss) > tolerance; it++)
     {
         // 0. Zero out the new centroids
         cudaMemset(d_new_centroids, 0, sizeof(float) * k * dims);
@@ -204,12 +204,8 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
 
         cudaDeviceSynchronize();
         cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost);
-        if (sqrt(loss) < tolerance)
-        {
-            printf("Converged in %d iterations\n", i);
-            break;
-        }
     }
+    printf("Converged in %d iterations\n", it);
 
     // Copy centroids back to the host
     std::vector<float> host_centroids(k * dims);
