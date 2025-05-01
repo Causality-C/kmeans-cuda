@@ -169,7 +169,7 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     int total = k * dims;
     int blocks = (total + threads - 1) / threads;
     float sharedMemSize = threads * sizeof(float);
-    float loss = INFINITY;
+    float loss = std::numeric_limits<float>::infinity();
 
     int it;
     for (it = 0; it < max_iter && sqrt(loss) > tolerance; it++)
@@ -199,7 +199,7 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
         // 6. Check convergence
         checkConvergence<<<blocks, threads, sharedMemSize>>>(d_centroids, d_new_centroids, d_loss, k, dims);
 
-        // 7. Copy shit
+        // 7. Update the centroids
         cudaMemcpy(d_centroids, d_new_centroids, sizeof(float) * k * dims, cudaMemcpyDeviceToDevice);
 
         cudaDeviceSynchronize();
@@ -226,7 +226,6 @@ extern "C" void launch_kmeans_kernel(std::vector<std::vector<float>> &data_point
     cudaFree(d_assignments);
     cudaFree(d_cluster_sizes);
     cudaFree(d_distance_for_points);
-    cudaFree(d_temp_storage);
     cudaFree(d_temp_histogram_storage);
     cudaFree(d_offsets);
     cudaFree(d_new_centroids);
